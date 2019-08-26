@@ -1,0 +1,115 @@
+%{
+    #include "expr_ast.h"
+%}
+
+%decls %{
+    #include <unordered_map>
+    #include <vector>
+    #include <iostream>
+    using namespace std;
+    class Statement;
+    class ASTNode;
+    using VariablesMap = unordered_map<string, int>;
+    using stmtsList = vector<Statement*>;
+
+%}
+
+%option lang="C++"
+%node ASTNode %abstract %typedef
+
+%node Expr ASTNode %abstract 
+
+%node BinaryExpr Expr %abstract = {
+    Expr *expr1;
+    Expr *expr2;
+}
+
+%node AddExpr BinaryExpr
+%node SubExpr BinaryExpr
+%node MulExpr BinaryExpr
+%node DivExpr BinaryExpr
+
+%node Number Expr = {
+    int value;
+}
+
+%node Ident Expr = {
+    string name;
+}
+
+%node Statement ASTNode %abstract %typedef
+
+%node BlockST Statement ={
+    %nocreate stmtsList stmts;
+}
+
+%node IfStatement Statement = {
+    Expr* cond;
+    BlockST *stmtsTrue;
+    BlockST *stmtsFalse;
+}
+
+%node PrintStatement Statement = {
+    Expr* expr;
+}
+
+%node AssignStatement Statement = {
+    Expr* lhs;
+    Expr* rhs;
+}
+
+%operation %virtual int eval(Expr *this, VariablesMap& vars)
+%operation %virtual void execute(Statement *this, VariablesMap& vars)
+
+
+eval(AddExpr){
+    return expr1->eval(vars) + expr1->eval(vars);
+}
+eval(SubExpr){
+    return expr1->eval(vars) - expr1->eval(vars);
+}
+eval(MulExpr){
+    return expr1->eval(vars) * expr1->eval(vars);
+}
+eval(DivExpr){
+    return expr1->eval(vars) / expr1->eval(vars);
+}
+
+eval(Number){
+    return value;
+}
+
+eval(Ident){
+    return vars[name];
+}
+
+execute(BlockST){
+    for(int i = 0; i < stmts.size();i++)
+    {
+        stmts[i]->execute(vars);
+    }
+}
+
+execute(IfStatement){
+    if(cond->eval(vars))
+    {
+        for(int i = 0; i < stmtsTrue->stmts.size();i++)
+        {
+            stmtsTrue->stmts[i]->execute(vars);
+        }
+    }
+    else{
+        for(int i = 0; i < stmtsFalse->stmts.size();i++)
+        {
+            stmtsFalse->stmts[i]->execute(vars);
+        }
+    }
+}
+
+execute(PrintStatement){
+    cout<< to_string(expr->eval(vars));
+}
+
+execute(AssignStatement){
+    vars[((Ident*)lhs)->name] = rhs->eval(vars);
+}
