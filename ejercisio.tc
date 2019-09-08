@@ -1,5 +1,17 @@
 %{
     #include "expr_ast.h"
+    void addSeqStmt(ASTNode* seq, ASTNode* node)
+    {
+        SeqStatement* s = (SeqStatement*)seq;
+        while (s->stmt2 != nullptr)
+        {
+            s = (SeqStatement*)s->stmt2;
+        }
+        SeqStatement *nuevo = new SeqStatement();
+        nuevo->stmt1 = node;
+        s->stmt2 = nuevo;
+        
+    }
 %}
 
 %decls %{
@@ -7,10 +19,13 @@
     #include <vector>
     #include <iostream>
     using namespace std;
-    class Statement;
-    class ASTNode;
     using VariablesMap = unordered_map<string, int>;
-    using stmtsList = vector<Statement*>;
+    using StdString = std::string;
+    class ASTNode;
+
+    void addSeqStmt(ASTNode* seq, ASTNode* node);
+
+
 
 %}
 
@@ -20,8 +35,8 @@
 %node Expr ASTNode %abstract 
 
 %node BinaryExpr Expr %abstract = {
-    Expr *expr1;
-    Expr *expr2;
+    ASTNode *expr1;
+    ASTNode *expr2;
 }
 
 %node AddExpr BinaryExpr
@@ -39,77 +54,63 @@
 
 %node Statement ASTNode %abstract %typedef
 
-%node BlockST Statement ={
-    %nocreate stmtsList stmts;
+%node SeqStatement Statement ={
+    %nocreate ASTNode *stmt1;
+    %nocreate ASTNode *stmt2;
 }
 
 %node IfStatement Statement = {
-    Expr* cond;
-    BlockST *stmtsTrue;
-    BlockST *stmtsFalse;
+    ASTNode* cond;
+    ASTNode *stmtsTrue;
+    ASTNode *stmtsFalse;
 }
 
 %node PrintStatement Statement = {
-    Expr* expr;
+    ASTNode* expr;
 }
 
 %node AssignStatement Statement = {
-    Expr* lhs;
-    Expr* rhs;
+    StdString lhs;
+    ASTNode* rhs;
 }
 
-%operation %virtual int eval(Expr *this, VariablesMap& vars)
-%operation %virtual void execute(Statement *this, VariablesMap& vars)
+%operation %virtual StdString toString(ASTNode *this)
+%operation %virtual StdString getOper(BinaryExpr *this)
 
+getOper(AddExpr) { return "+"; }
+getOper(SubExpr) { return "-"; }
+getOper(MulExpr) { return "*"; }
+getOper(DivExpr) { return "/"; }
 
-eval(AddExpr){
-    return expr1->eval(vars) + expr1->eval(vars);
-}
-eval(SubExpr){
-    return expr1->eval(vars) - expr1->eval(vars);
-}
-eval(MulExpr){
-    return expr1->eval(vars) * expr1->eval(vars);
-}
-eval(DivExpr){
-    return expr1->eval(vars) / expr1->eval(vars);
+toString(BinaryExpr) {
+    std::string s1 = expr1->toString();
+    std::string s2 = expr2->toString();
+
+    return "(" + s1 + ")" + getOper() + "(" + s2 + ")";
 }
 
-eval(Number){
-    return value;
+toString(Number) {
+    return std::to_string(value);
 }
 
-eval(Ident){
-    return vars[name];
+toString(Ident) {
+    return name;
 }
 
-execute(BlockST){
-    for(int i = 0; i < stmts.size();i++)
-    {
-        stmts[i]->execute(vars);
-    }
+toString(AssignStatement) {
+    return lhs + "=" + rhs->toString();
 }
 
-execute(IfStatement){
-    if(cond->eval(vars))
-    {
-        for(int i = 0; i < stmtsTrue->stmts.size();i++)
-        {
-            stmtsTrue->stmts[i]->execute(vars);
-        }
-    }
-    else{
-        for(int i = 0; i < stmtsFalse->stmts.size();i++)
-        {
-            stmtsFalse->stmts[i]->execute(vars);
-        }
-    }
+toString(PrintStatement) {
+    return "print " + expr->toString();
 }
 
-execute(PrintStatement){
-    cout<< to_string(expr->eval(vars));
+toString(IfStatement) {
+    return "if (" + cond->toString() + ") {\n"
+           + stmtsTrue->toString() + "\n} else {\n"
+           + stmtsFalse->toString() + "\n}";
 }
 
-execute(AssignStatement){
-    vars[((Ident*)lhs)->name] = rhs->eval(vars);
+toString(SeqStatement) {
+    return stmt1->toString() + "\n" + stmt2->toString();
 }
