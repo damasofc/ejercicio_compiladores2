@@ -43,11 +43,11 @@
 
 %%
 
-prog: stmts {((Expr*)$1)->eval(symbols);}
+prog: stmts {$1->toString(symbols);}
     ;
 
-stmts: stmt {$$ = new BlockST(); ((BlockST*)$$)->stmts.push_back((Statement*)$1);}
-    | stmts stmt {$$ = $1; ((BlockST*)$$)->stmts.push_back(((Statement*)$2)); }
+stmts: stmt {$$ = new SeqStatement(); ((SeqStatement*)$$)->stmt1 = $1;}
+    | stmts stmt {$$ = $1; addSeqStmt($1,$2); }
     ;
 
 stmt: assign {$$ = $1;}
@@ -55,22 +55,22 @@ stmt: assign {$$ = $1;}
     | if_else {$$ = $1;}
     ;
 
-assign: "id" "=" expr ";" {$$ = new AssignStatement((Expr*)$1,(Expr*)$3);}
+assign: "id" "=" expr ";" {$$ = new AssignStatement($1,$3);}
     ;
 
-print: "print" expr ";" {$$ = new PrintStatement((Expr*)$2); }
+print: "print" expr ";" {$$ = new PrintStatement($2); }
     ;
 
-if_else: "if" "(" expr ")" "{" stmts "}" "else" "{" stmts "}" {$$ = new IfStatement((Expr*)$3,(BlockST*)$6,(BlockST*)$10);}
+if_else: "if" "(" expr ")" "{" stmts "}" "else" "{" stmts "}" {$$ = new IfStatement($3,$6,$10);}
     ;
 
-expr: expr "+" term {$$ = new AddExpr((Expr*)$1,(Expr*)$3);}
-    | expr "-" term {$$ = new SubExpr((Expr*)$1,(Expr*)$3);}
+expr: expr "+" term {$$ = new AddExpr($1,$3);}
+    | expr "-" term {$$ = new SubExpr($1,$3);}
     | term {$$ = $1;}
     ;
 
-term: term "*" factor {$$ = new MulExpr((Expr*)$1,(Expr*)$3);}
-    | term "/" factor {$$ = new DivExpr((Expr*)$1,(Expr*)$3);}
+term: term "*" factor {$$ = new MulExpr($1,$3);}
+    | term "/" factor {$$ = new DivExpr($1,$3);}
     | factor {$$ = $1;}
     ;
 

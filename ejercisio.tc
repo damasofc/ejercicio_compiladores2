@@ -70,11 +70,11 @@
 }
 
 %node AssignStatement Statement = {
-    StdString lhs;
+    ASTNode* lhs;
     ASTNode* rhs;
 }
 
-%operation %virtual StdString toString(ASTNode *this)
+%operation %virtual StdString toString(ASTNode *this,VariablesMap vars)
 %operation %virtual StdString getOper(BinaryExpr *this)
 
 getOper(AddExpr) { return "+"; }
@@ -83,8 +83,8 @@ getOper(MulExpr) { return "*"; }
 getOper(DivExpr) { return "/"; }
 
 toString(BinaryExpr) {
-    std::string s1 = expr1->toString();
-    std::string s2 = expr2->toString();
+    std::string s1 = expr1->toString(vars);
+    std::string s2 = expr2->toString(vars);
 
     return "(" + s1 + ")" + getOper() + "(" + s2 + ")";
 }
@@ -98,19 +98,19 @@ toString(Ident) {
 }
 
 toString(AssignStatement) {
-    return lhs + "=" + rhs->toString();
+    return lhs->toString(vars) + "=" + rhs->toString(vars);
 }
 
 toString(PrintStatement) {
-    return "print " + expr->toString();
+    return "print " + expr->toString(vars);
 }
 
 toString(IfStatement) {
-    return "if (" + cond->toString() + ") {\n"
-           + stmtsTrue->toString() + "\n} else {\n"
-           + stmtsFalse->toString() + "\n}";
+    return "if (" + cond->toString(vars) + ") {\n"
+           + stmtsTrue->toString(vars) + "\n} else {\n"
+           + stmtsFalse->toString(vars) + "\n}";
 }
 
 toString(SeqStatement) {
-    return stmt1->toString() + "\n" + stmt2->toString();
+    return stmt1->toString(vars) + "\n" + stmt2->toString(vars);
 }
