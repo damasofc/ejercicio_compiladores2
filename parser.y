@@ -43,11 +43,11 @@
 
 %%
 
-prog: stmts {$1->toString(symbols);}
+prog: stmts {std::cout<< $1->toString(symbols);}
     ;
 
 stmts: stmt {$$ = new SeqStatement(); ((SeqStatement*)$$)->stmt1 = $1;}
-    | stmts stmt {$$ = $1; addSeqStmt($1,$2); }
+    | stmts stmt {$$ = $1; addSeqStmt($$,$2); }
     ;
 
 stmt: assign {$$ = $1;}

@@ -3,14 +3,13 @@
     void addSeqStmt(ASTNode* seq, ASTNode* node)
     {
         SeqStatement* s = (SeqStatement*)seq;
-        while (s->stmt2 != nullptr)
+        while (s->stmt2)
         {
             s = (SeqStatement*)s->stmt2;
         }
         SeqStatement *nuevo = new SeqStatement();
         nuevo->stmt1 = node;
         s->stmt2 = nuevo;
-        
     }
 %}
 
