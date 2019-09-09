@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <list>
 #include <queue>
-//cambio
+
 class CFGNode;
 class CFGExpr;
 class CFGStmt;
@@ -270,14 +270,18 @@ getLvalAsm(CFGOperand){
 }
 
 getLvalAsm(CFGLValueOperand){
-    return "poyo!";
+    return id;
 }
 
 vizto(CFGAssignStmt){
     std::string haudi;
 
-    haudi = rhs->vizto();
-    std::cout<<"estoy en assign prros\n";
+    if(rhs->isA(CFGBinaryExpr_kind)){
+        haudi = rhs->vizto();
+    }
+    else{
+        haudi = "mov eax, "+rhs->vizto();
+    }
     haudi+= "\n";
     haudi+= "mov "+lhs->getLvalAsm()+", eax\n";
 
@@ -369,7 +373,7 @@ vizto(CFGDivExpr){
 
     }
 
-    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi+= "mov eax, "+operand1->vizto()+"\n";
     haudi+= "cdq\n";
     haudi+= "idiv "+starr+"\n";
 
@@ -453,12 +457,11 @@ vizto(CFGNEExpr){
 }
 
 vizto(CFGNumOperand){
-    return "mov eax, " + std::to_string(value);
+    return std::to_string(value);
 }
 
 vizto(CFGLValueOperand){
-    //return getLvalAsm();
-    return "poyo!";
+    return getLvalAsm();
 }
 
 
