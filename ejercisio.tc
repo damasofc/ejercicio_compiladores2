@@ -18,8 +18,11 @@
     {
         CFGStmtPair sp = res->toCFG(ctx);
         CFGStmt *stmt = CFGRemoveNops(sp.first);
-        CFGSetLabels(stmt);
-        cout<<CFGToString(stmt)<<endl;
+        CFGStmt *stmt2 = CFGMakeBasicBlocks(stmt);
+        CFGSetLabels(stmt2);
+
+        //cout<<CFGToString(stmt2)<<endl;
+        cout<<getAsm(stmt2,ctx.countTemps*4,4)<<endl;
     }
 %}
 

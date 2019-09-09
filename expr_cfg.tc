@@ -28,6 +28,8 @@ CFGStmt *CFGMakeBasicBlocks(CFGStmt *root);
 std::string CFGToString(CFGStmt *root);
 CFGStmt *CFGRemoveNops(CFGStmt *root);
 
+std::string getAsm(CFGStmt* root, int varsize, int tempsize);
+
 %}
 
 %{
@@ -125,6 +127,8 @@ CFGStmt *CFGRemoveNops(CFGStmt *root);
 %operation %virtual CFGStmt *getNext(CFGStmt *this)
 %operation %virtual int edgeCount(CFGStmt *this)
 %operation %virtual CFGStmtVector getEdges(CFGStmt *this)
+%operation %virtual StdString vizto(CFGNode *this)
+%operation %virtual StdString getLvalAsm(CFGOperand* this)
 
 edgeCount(CFGStmt) { return 0; }
 edgeCount(CFGSimpleStmt) { return (next != nullptr)? 1 : 0; }
@@ -256,3 +260,207 @@ toString(CFGBlockStmt) {
 toString(CFGRetStmt) {
     return "ret";
 }
+
+vizto(CFGNode){
+    throw "error";
+}
+
+getLvalAsm(CFGOperand){
+    throw "error";
+}
+
+getLvalAsm(CFGLValueOperand){
+    return "poyo!";
+}
+
+vizto(CFGAssignStmt){
+    std::string haudi;
+
+    haudi = rhs->vizto();
+    std::cout<<"estoy en assign prros\n";
+    haudi+= "\n";
+    haudi+= "mov "+lhs->getLvalAsm()+", eax\n";
+
+    return haudi;
+}
+
+vizto(CFGParamStmt){
+    return "push "+operand->vizto()+"\n";
+}
+
+vizto(CFGCallStmt){
+    return "call "+ name + "\n" + "add esp, "+std::to_string(arg_count*4)+ "\n";
+}
+
+vizto(CFGRetStmt){
+    return "jmp main_end:\n";
+}
+
+vizto(CFGCBRStmt){
+    std::string haudi;
+
+    haudi = cond->vizto()+"\n";
+
+    haudi += "cmp eax, 0\n";
+    haudi += "je "+target_false->label+"\n";
+    haudi += "jmp "+target_true->label+"\n";
+
+    return haudi;
+}
+
+vizto(CFGBlockStmt){
+    std::string haudi;
+
+    CFGStmt* okurr = first;
+
+    while(okurr != last){
+        haudi+= okurr->vizto() + "\n";
+        okurr = okurr->getNext();
+    }
+
+    haudi+= last->vizto();
+
+    return haudi;
+}
+
+vizto(CFGNopStmt){
+    return "nop\n";
+}
+
+vizto(CFGUnaryExpr){
+    return "mov eax, "+operand->vizto()+"\n";
+}
+
+vizto(CFGAddExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi+= "add eax, "+operand2->vizto()+"\n";
+
+    return haudi;
+}
+
+vizto(CFGSubExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi+= "sub eax, "+operand2->vizto()+"\n";
+
+    return haudi;
+}
+
+vizto(CFGMulExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi+= "imul eax, "+operand2->vizto()+"\n";
+
+    return haudi;
+}
+
+vizto(CFGDivExpr){
+    std::string haudi;
+    std::string starr = operand2->vizto();
+
+
+    if(operand2->getKind()== CFGLValueOperand_kind){
+        haudi+= "mov ebx, "+starr+"\n";
+        starr = "ebx";
+
+    }
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi+= "cdq\n";
+    haudi+= "idiv "+starr+"\n";
+
+
+    return haudi;
+}
+
+vizto(CFGGEExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "setge bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGLTExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "setl bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGEQExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "sete bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGLEExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "setle bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGGTExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "setg bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGNegExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand->vizto()+"\n";
+    haudi+= "neg eax\n";
+
+    return haudi;
+}
+
+vizto(CFGNEExpr){
+    std::string haudi;
+
+    haudi = "mov eax, "+operand1->vizto()+"\n";
+    haudi += "cmp eax, "+operand2->vizto()+"\n";
+    haudi += "setne bl\n";
+    haudi += "movzx eax, bl";
+
+    return haudi;
+}
+
+vizto(CFGNumOperand){
+    return "mov eax, " + std::to_string(value);
+}
+
+vizto(CFGLValueOperand){
+    //return getLvalAsm();
+    return "poyo!";
+}
+
+
+
+

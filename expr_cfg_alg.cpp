@@ -59,6 +59,53 @@ static inline void printStmtInfo(const char *tabs, CFGStmt *s) {
     }
 }
 
+std::string getAsm(CFGStmt* root, int varsize, int tempsize){
+    std::queue<CFGStmt *> q;
+    std::unordered_set<CFGStmt *> visited;
+
+    std::string haudi;
+    
+    q.push(root);
+    while (!q.empty()) {
+        CFGStmt *s = q.front();
+        q.pop();
+
+        if (visited.find(s) != visited.end()) {
+            continue;
+        }
+        if(s->label.length() > 0){
+            haudi+= s->label + ":\n";
+        }
+
+        haudi+= s->vizto();
+
+
+        visited.insert(s);
+        CFGStmtVector edges = s->getEdges();
+
+        if(edges.size() == 1 && edges[0]->label.length() > 0 ){
+            haudi+= "jmp "+edges[0]->label+"\n";
+        }
+
+        for (int i = 0; i < edges.size(); i++) {
+            q.push(edges[i]);
+        }
+    }
+
+    std::string retoro = "global main\nextern printf\nsection .text\n\n";
+    retoro+="main:\n";
+    retoro+= "push ebp\n";
+    retoro+= "mov ebp, esp\n";
+    retoro+= "sub ebp, "+std::to_string(varsize+tempsize)+"\n";
+    retoro+= haudi+"\n";
+    retoro+= "main_end:\n";
+    retoro+= "leave\n";
+    retoro+= "ret\n\n";
+
+
+    return retoro;
+}
+
 void CFGSetLabels(CFGStmt *root) {
     std::queue<CFGStmt *> q;
     std::unordered_set<CFGStmt *> visited;
@@ -81,6 +128,7 @@ void CFGSetLabels(CFGStmt *root) {
         }
     }
 }
+
 
 void CFGHVisit(CFGStmt *root) {
     std::queue<CFGStmt *> q;
