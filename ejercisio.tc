@@ -1,5 +1,7 @@
 %{
     #include "expr_ast.h"
+
+    CFGNodePool cfg_pool;
     void addSeqStmt(ASTNode* seq, ASTNode* node)
     {
         SeqStatement* s = (SeqStatement*)seq;
@@ -17,19 +19,43 @@
     #include <unordered_map>
     #include <vector>
     #include <iostream>
+    #include <sstream>
+    #include <utility>
+    #include "expr_cfg.h"
     using namespace std;
     using VariablesMap = unordered_map<string, int>;
     using StdString = std::string;
     class ASTNode;
 
+    using CFGStmtPair = std::pair<CFGStmt *, CFGStmt *>;
+    using CFGStmtPtr = CFGStmt*;
+
     void addSeqStmt(ASTNode* seq, ASTNode* node);
+
+    class ASTContext
+    {
+    public:
+        ASTContext(){
+            countTemps = 0;
+        }
+        std::string newTemp()
+        {
+            std::string s("t"+std::to_string(countTemps));
+            countTemps++;
+            return s;
+        }
+        int countTemps;
+        std::unordered_map<std::string,int> vars;
+    };
 
 
 
 %}
 
 %option lang="C++"
-%node ASTNode %abstract %typedef
+%node ASTNode %abstract %typedef ={
+    %nocreate CFGOperand *place = {nullptr};
+}
 
 %node Expr ASTNode %abstract 
 
@@ -48,7 +74,7 @@
 }
 
 %node Ident Expr = {
-    string name;
+    StdString name;
 }
 
 %node Statement ASTNode %abstract %typedef
@@ -73,8 +99,134 @@
     ASTNode* rhs;
 }
 
-%operation %virtual StdString toString(ASTNode *this,VariablesMap vars)
+%operation %virtual StdString toString(ASTNode *this,ASTContext vars)
 %operation %virtual StdString getOper(BinaryExpr *this)
+
+%operation %virtual CFGStmtPair toCFG(ASTNode *this, ASTContext& ctx )
+%operation %virtual CFGStmt* shortCircuit(Expr *this, CFGStmt *t,CFGStmt *f,ASTContext& ctx)
+
+shortCircuit(Expr){
+    CFGStmtPair ep = toCFG(ctx);
+
+
+    CFGExpr *cond = cfg_pool.CFGUnaryExprCreate(place);
+    CFGStmtPtr stmt = cfg_pool.CFGCBRStmtCreate(cond,t,f);
+
+    ep.second->setNext(stmt);
+    // t->addPred(stmt);
+    // f->addPred(stmt);
+
+    return ep.first;
+}
+
+toCFG(AddExpr){
+    CFGStmtPair p1 = expr1->toCFG(ctx);
+    CFGStmtPair p2 = expr2->toCFG(ctx);
+
+    place = cfg_pool.CFGLValueOperandCreate(ctx.newTemp());
+
+    CFGExpr *expr = cfg_pool.CFGAddExprCreate(expr1->place,expr2->place);
+
+    CFGStmt *stmt = cfg_pool.CFGAssignStmtCreate(place,expr);    
+
+    p1.second->setNext(p2.first);
+    p2.second->setNext(stmt);
+
+    return CFGStmtPair(p1.first,stmt);
+    return CFGStmtPair();
+}
+toCFG(SubExpr){
+    CFGStmtPair p1 = expr1->toCFG(ctx);
+    CFGStmtPair p2 = expr2->toCFG(ctx);
+
+    place = cfg_pool.CFGLValueOperandCreate(ctx.newTemp());
+
+    CFGExpr *expr = cfg_pool.CFGSubExprCreate(expr1->place,expr2->place);
+
+    CFGStmt *stmt = cfg_pool.CFGAssignStmtCreate(place,expr);    
+
+    p1.second->setNext(p2.first);
+    p2.second->setNext(stmt);
+
+    return CFGStmtPair(p1.first,stmt);
+}
+toCFG(MulExpr){
+    CFGStmtPair p1 = expr1->toCFG(ctx);
+    CFGStmtPair p2 = expr2->toCFG(ctx);
+
+    place = cfg_pool.CFGLValueOperandCreate(ctx.newTemp());
+
+    CFGExpr *expr = cfg_pool.CFGMulExprCreate(expr1->place,expr2->place);
+
+    CFGStmt *stmt = cfg_pool.CFGAssignStmtCreate(place,expr);    
+
+    p1.second->setNext(p2.first);
+    p2.second->setNext(stmt);
+
+    return CFGStmtPair(p1.first,stmt);
+}
+toCFG(DivExpr){
+    CFGStmtPair p1 = expr1->toCFG(ctx);
+    CFGStmtPair p2 = expr2->toCFG(ctx);
+
+    place = cfg_pool.CFGLValueOperandCreate(ctx.newTemp());
+
+    CFGExpr *expr = cfg_pool.CFGDivExprCreate(expr1->place,expr2->place);
+
+    CFGStmt *stmt = cfg_pool.CFGAssignStmtCreate(place,expr);    
+
+    p1.second->setNext(p2.first);
+    p2.second->setNext(stmt);
+
+    return CFGStmtPair(p1.first,stmt);
+}
+
+toCFG(Number){
+    place = cfg_pool.CFGNumOperandCreate(value);
+    CFGStmt* nop = cfg_pool.CFGNopStmtCreate();
+    return CFGStmtPair(nop,nop);
+}
+
+toCFG(Ident){
+    place = cfg_pool.CFGLValueOperandCreate(name);
+    CFGStmt* nop = cfg_pool.CFGNopStmtCreate();
+    return CFGStmtPair(nop,nop);
+}
+toCFG(AssignStatement){
+    CFGStmtPair ep = rhs->toCFG(ctx);
+    CFGOperand *clhs = cfg_pool.CFGLValueOperandCreate(((Ident*)lhs)->name);
+    CFGStmt *stmt = cfg_pool.CFGAssignStmtCreate(clhs,rhs->place);
+    ep.second->setNext(stmt);
+
+    return CFGStmtPair(ep.first,stmt);
+}
+toCFG(PrintStatement){
+    CFGStmtPair ex = expr->toCFG(ctx);
+    CFGStmt *stmtParam = cfg_pool.CFGParamStmtCreate(expr->place);
+    CFGStmt *stmtPrint = cfg_pool.CFGCallStmtCreate("print",1);
+    ex.second->setNext(stmtParam);
+    stmtParam->setNext(stmtPrint);
+    return CFGStmtPair(ex.first,stmtPrint);
+}
+
+toCFG(IfStatement){
+    CFGStmtPair t = stmtsTrue->toCFG(ctx);
+    CFGStmtPair f = stmtsFalse->toCFG(ctx);
+    CFGStmt* nop = cfg_pool.CFGNopStmtCreate();
+    
+    t.second->setNext(nop);
+    f.second->setNext(nop);
+
+    CFGStmtPtr stmt = ((Expr*)cond)->shortCircuit(t.first,f.first,ctx);
+    return CFGStmtPair(stmt,nop);
+}
+toCFG(SeqStatement){
+    CFGStmtPair f = stmt1->toCFG(ctx);
+    CFGStmtPair n = stmt2->toCFG(ctx);
+    f.second->setNext(n.first);
+    
+    return CFGStmtPair(f.first,n.second);
+}
 
 getOper(AddExpr) { return "+"; }
 getOper(SubExpr) { return "-"; }
@@ -111,5 +263,10 @@ toString(IfStatement) {
 }
 
 toString(SeqStatement) {
-    return stmt1->toString(vars) + "\n" + stmt2->toString(vars);
+    if(stmt2)
+        return stmt1->toString(vars) + "\n" + stmt2->toString(vars);
+    else 
+    {
+        return stmt1->toString(vars) + "\n";
+    }
 }

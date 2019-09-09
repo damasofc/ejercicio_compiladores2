@@ -7,11 +7,12 @@
 %{
     #include <iostream>
     #include <unordered_map>
+    #include "expr_ast.h"
     extern int yylex();
     extern int yylineno;
     extern FILE* yyin;
     int errors;
-    std::unordered_map<std::string, int> symbols;
+    ASTContext ctx;
     void yyerror(const char *msg){
         std::cout<<"Error en linea: "<<yylineno<<" -> "<<msg<<std::endl;
         errors++;
@@ -43,11 +44,11 @@
 
 %%
 
-prog: stmts {std::cout<< $1->toString(symbols);}
+prog: stmts {$$ = $1; $$->toCFG(ctx); }
     ;
 
 stmts: stmt {$$ = new SeqStatement(); ((SeqStatement*)$$)->stmt1 = $1;}
-    | stmts stmt {$$ = $1; addSeqStmt($$,$2); }
+    | stmts stmt {$$ = $1; addSeqStmt($$,$2);  }
     ;
 
 stmt: assign {$$ = $1;}

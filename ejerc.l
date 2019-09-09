@@ -28,7 +28,7 @@ digit [0-9]
 "if" {return Kw_if; }
 "else" {return Kw_else; }
 "print" { return Kw_Print; }
-[A-Za-z]+ { yylval = new Ident(yytext) ;return ID; }
+[A-Za-z]+ { yylval = new Ident(yytext);return ID; }
 \n { yylineno++;}
 . { return ERROR; }
 

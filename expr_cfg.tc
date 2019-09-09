@@ -1,0 +1,258 @@
+%option lang = "C++"
+%option reentrant
+%option state_type = "CFGNodePool"
+%option no_track_lines
+
+%decls %{
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <unordered_set>
+#include <unordered_map>
+#include <list>
+#include <queue>
+
+class CFGNode;
+class CFGExpr;
+class CFGStmt;
+
+using StdString = std::string;
+using CFGExprList = std::list<CFGExpr *>;
+using CFGStmtList = std::list<CFGStmt *>;
+using CFGStmtPair = std::pair<CFGStmt *, CFGStmt *>;
+using CFGStmtVector = std::vector<CFGStmt *>;
+
+void CFGHVisit(CFGStmt *root);
+void CFGSetLabels(CFGStmt *root);
+CFGStmt *CFGMakeBasicBlocks(CFGStmt *root);
+std::string CFGToString(CFGStmt *root);
+CFGStmt *CFGRemoveNops(CFGStmt *root);
+
+%}
+
+%{
+#include "expr_cfg.h"
+%}
+
+%node CFGNode %abstract %typedef = {
+}
+
+%node CFGStmt CFGNode %abstract = {
+    %nocreate StdString label = {""};
+    %nocreate int pred_count = {0};
+}
+
+%node CFGSimpleStmt CFGStmt %abstract = {
+    %nocreate CFGStmt *next = {nullptr};
+}
+
+%node CFGBlockStmt CFGStmt = {
+    CFGStmt *first;
+    CFGStmt *last;
+}
+
+%node CFGNopStmt CFGSimpleStmt
+
+%node CFGCBRStmt CFGStmt = {
+    CFGExpr *cond;
+    CFGStmt *target_true;
+    CFGStmt *target_false;
+}
+
+%node CFGAssignStmt CFGSimpleStmt = {
+    CFGOperand *lhs;
+    CFGExpr *rhs;
+}
+
+%node CFGRetStmt CFGSimpleStmt = {
+    CFGExpr *expr;
+}
+
+%node CFGParamStmt CFGSimpleStmt = {
+    CFGOperand *operand;
+}
+
+%node CFGCallStmt CFGSimpleStmt = {
+    StdString name;
+    int arg_count;
+}
+
+%node CFGExpr CFGNode %abstract
+
+%node CFGOperand CFGExpr %abstract
+
+%node CFGNumOperand CFGOperand = {
+    int value;
+}
+
+%node CFGStrOperand CFGOperand = {
+    StdString value;
+}
+
+%node CFGLValueOperand CFGOperand = {
+    StdString id;
+}
+
+%node CFGBinaryExpr CFGExpr %abstract = {
+    CFGOperand *operand1;
+    CFGOperand *operand2;
+}
+
+%node CFGUnaryExpr CFGExpr = {
+    CFGOperand *operand;
+}
+
+%node CFGAddExpr CFGBinaryExpr
+%node CFGSubExpr CFGBinaryExpr
+%node CFGMulExpr CFGBinaryExpr
+%node CFGDivExpr CFGBinaryExpr
+%node CFGModExpr CFGBinaryExpr
+%node CFGGTExpr CFGBinaryExpr
+%node CFGGEExpr CFGBinaryExpr
+%node CFGLTExpr CFGBinaryExpr
+%node CFGLEExpr CFGBinaryExpr
+%node CFGEQExpr CFGBinaryExpr
+%node CFGNEExpr CFGBinaryExpr
+
+%node CFGNegExpr CFGExpr = {
+    CFGOperand *operand;
+}
+
+%operation %virtual StdString getOper(CFGBinaryExpr *this)
+%operation %virtual StdString toString(CFGNode *this)
+%operation %virtual void setNext(CFGStmt *this, CFGStmt *nstmt)
+%operation %virtual void addPred(CFGStmt *this, CFGStmt *stmt)
+%operation %virtual CFGStmt *getNext(CFGStmt *this)
+%operation %virtual int edgeCount(CFGStmt *this)
+%operation %virtual CFGStmtVector getEdges(CFGStmt *this)
+
+edgeCount(CFGStmt) { return 0; }
+edgeCount(CFGSimpleStmt) { return (next != nullptr)? 1 : 0; }
+edgeCount(CFGCBRStmt) { return 2; }
+
+setNext(CFGStmt) { /* Nothing */ }
+
+setNext(CFGSimpleStmt) { 
+    next = nstmt; 
+    nstmt->addPred(this);
+}
+
+addPred(CFGStmt) { pred_count++; }
+
+getNext(CFGStmt) { return nullptr; }
+getNext(CFGSimpleStmt) { return next; }
+getNext(CFGBlockStmt) { return last->getNext(); }
+
+getEdges(CFGSimpleStmt) { 
+    CFGStmtVector edges;
+
+    if (next != nullptr) {
+        edges.push_back(next);
+    }
+
+    return edges;
+}
+
+getEdges(CFGCBRStmt) {
+    CFGStmtVector edges(2);
+
+    edges[0] = target_true;
+    edges[1] = target_false;
+    return edges;
+}
+
+getEdges(CFGBlockStmt) {
+    return last->getEdges();
+}
+
+getOper(CFGAddExpr) { return "+"; }
+getOper(CFGSubExpr) { return "-"; }
+getOper(CFGMulExpr) { return "*"; }
+getOper(CFGDivExpr) { return "/"; }
+getOper(CFGModExpr) { return "%"; }
+getOper(CFGGTExpr) { return ">"; }
+getOper(CFGGEExpr) { return ">="; }
+getOper(CFGLTExpr) { return "<"; }
+getOper(CFGLEExpr) { return "<="; }
+getOper(CFGEQExpr) { return "=="; }
+getOper(CFGNEExpr) { return "!="; }
+
+toString(CFGNode) { return  ""; }
+
+toString(CFGStrOperand) {
+    return "\"" + value + "\"";
+}
+
+toString(CFGNumOperand) {
+    return std::to_string(value);
+}
+
+toString(CFGLValueOperand) {
+    return id;
+}
+
+toString(CFGBinaryExpr) {
+    std::string s1 = operand1->toString();
+    std::string s2 = operand2->toString();
+
+    return s1 + " " + getOper() + " " + s2;
+}
+
+toString(CFGNegExpr) {
+    return "-" + operand->toString();
+}
+
+toString(CFGUnaryExpr) {
+    return operand->toString();
+}
+
+toString(CFGCallStmt) {
+    std::ostringstream out;
+
+    out << "call " << name << ", " << arg_count;
+
+    return out.str();    
+}
+
+toString(CFGParamStmt) {
+    return "param " + operand->toString();
+}
+
+toString(CFGNopStmt) {
+    return "nop";
+}
+
+toString(CFGCBRStmt) {
+    std::ostringstream out;
+
+    out << "cbr(" << cond->toString() << ", "
+        << target_true->label << ", "
+        << target_false->label << ")";
+
+    return out.str();
+}
+
+toString(CFGAssignStmt) {
+    std::ostringstream out;
+
+    out << lhs->toString() << " = " << rhs->toString();
+
+    return out.str();
+}
+
+toString(CFGBlockStmt) {
+    std::ostringstream out;
+
+    CFGStmt *s = first;
+    while (s != last ) {
+        out << s->toString() << '\n';
+        s = s->getNext();
+    }
+    out << last->toString() << '\n';
+
+    return out.str();
+}
+
+toString(CFGRetStmt) {
+    return "ret";
+}
