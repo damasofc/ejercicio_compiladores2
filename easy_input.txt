@@ -1,1 +1,10 @@
 x = 2;
+y = x*2;
+if(y > 0)
+{
+    print y;
+}
+else
+{
+    print x;
+}

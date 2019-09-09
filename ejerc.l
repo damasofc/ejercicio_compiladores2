@@ -20,6 +20,11 @@ digit [0-9]
 "/" {return opDiv; }
 "=" {return opAssign; }
 "==" {return opEqual; }
+">" {return opGreater; }
+">=" {return opGreaterEqual; }
+"<" {return opLess; }
+"<=" {return opLessEqual; }
+"!=" {return opNEQ; }
 "(" {return OpenParen; }
 ")" {return CloseParen; }
 "{" {return OpenCorchetes; }

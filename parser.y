@@ -29,6 +29,11 @@
 %token opMul "*"
 %token opDiv "/"
 %token opEqual "=="
+%token opGreater ">"
+%token opGreaterEqual ">="
+%token opLess "<"
+%token opLessEqual "<="
+%token opNEQ "!="
 %token opAssign "="
 %token Kw_if "if"
 %token Kw_else "else"
@@ -44,7 +49,7 @@
 
 %%
 
-prog: stmts {$$ = $1; $$->toCFG(ctx); }
+prog: stmts {$$ = $1; finishToCFG($$,ctx); }
     ;
 
 stmts: stmt {$$ = new SeqStatement(); ((SeqStatement*)$$)->stmt1 = $1;}
@@ -65,8 +70,17 @@ print: "print" expr ";" {$$ = new PrintStatement($2); }
 if_else: "if" "(" expr ")" "{" stmts "}" "else" "{" stmts "}" {$$ = new IfStatement($3,$6,$10);}
     ;
 
-expr: expr "+" term {$$ = new AddExpr($1,$3);}
-    | expr "-" term {$$ = new SubExpr($1,$3);}
+expr: expr "+" termP {$$ = new AddExpr($1,$3);}
+    | expr "-" termP {$$ = new SubExpr($1,$3);}
+    | termP {$$ = $1;}
+    ;
+
+termP: termP "<" term {$$ = new LTExpr($1,$3);}
+    | termP ">" term {$$ = new GTExpr($1,$3);}
+    | termP ">=" term {$$ = new GEExpr($1,$3);}
+    | termP "<=" term {$$ = new LEExpr($1,$3);}
+    | termP "==" term {$$ = new EQExpr($1,$3);}
+    | termP "!=" term {$$ = new NEQExpr($1,$3);}
     | term {$$ = $1;}
     ;
 
